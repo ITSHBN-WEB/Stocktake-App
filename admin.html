@@ -65,8 +65,13 @@
     <div class="badge">⚠️ Admin only — do not share this URL</div>
     <h2>📂 Upload Excel to Google Sheet</h2>
     <p style="color:#666; font-size:13px; margin-bottom:16px">
-      Drop your SAP physical inventory Excel file below. Only the required 13 columns will be extracted and written to the <strong>Upload</strong> sheet — existing data will be overwritten.
+      Select the department, then drop your SAP physical inventory Excel file. Data will be written to a sheet named <strong>UPLOAD - [DEPARTMENT]</strong>.
     </p>
+
+    <label>Department</label>
+    <select id="dept-select">
+      <option value="">Loading departments...</option>
+    </select>
 
     <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
       <div class="icon">📄</div>
@@ -128,6 +133,7 @@ function checkPin() {
   if (pin === ADMIN_PIN) {
     document.getElementById("pin-screen").classList.add("hidden");
     document.getElementById("admin-panel").classList.remove("hidden");
+    loadDepartments();
   } else {
     statusEl.className = "status visible error";
     statusEl.textContent = "❌ Incorrect PIN. Try again.";
@@ -135,6 +141,25 @@ function checkPin() {
   }
 }
 
+function loadDepartments() {
+  var select = document.getElementById("dept-select");
+  fetch(API_URL + "?action=getdepartments")
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.success && data.departments) {
+        select.innerHTML = '<option value="">Select department...</option>' +
+          data.departments.map(function(d) {
+            return '<option value="' + d + '">' + d + '</option>';
+          }).join("");
+      } else {
+        select.innerHTML = '<option value="">Failed to load</option>';
+      }
+    })
+    .catch(function() {
+      select.innerHTML = '<option value="">Failed to load — refresh</option>';
+    });
+}
+  
 // ── DRAG & DROP ───────────────────────────────────
 var dropZone = document.getElementById("drop-zone");
 dropZone.addEventListener("dragover", function(e) {
@@ -222,6 +247,11 @@ function showPreview(rows) {
 
 // ── UPLOAD TO SHEET ───────────────────────────────
 function uploadToSheet() {
+  var dept = document.getElementById("dept-select").value;
+  if (!dept) {
+    setStatus("upload-status", "error", "❌ Please select a department first.");
+    return;
+  }
   if (extractedRows.length === 0) {
     setStatus("upload-status", "error", "❌ No data to upload.");
     return;
@@ -256,6 +286,7 @@ function uploadChunk(chunks, index, isFirst) {
     headers: { "Content-Type": "text/plain" },
     body: JSON.stringify({
       action: "uploadSheet",
+      department: document.getElementById("dept-select").value,
       rows: chunks[index],
       isFirst: isFirst
     })
