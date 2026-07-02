@@ -152,7 +152,7 @@ function handleFile(file) {
       var data = new Uint8Array(e.target.result);
       var workbook = XLSX.read(data, { type: "array" });
       var sheet = workbook.Sheets[workbook.SheetNames[0]];
-      var allRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      var allRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false, dateNF: "DD/MM/YYYY" });
 
       if (allRows.length < 2) {
         setStatus("upload-status", "error", "❌ Excel file appears to be empty.");
