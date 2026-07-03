@@ -94,12 +94,174 @@
     </div>
   </div>
 
+<div class="card">
+    <h2>📋 Update MASTER LIST</h2>
+    <p style="color:#666; font-size:13px; margin-bottom:16px">
+      Drop your MASTER LIST Excel (Material, Description, Group, Sales Unit, Numerator, EAN/UPC, Department). Existing barcodes will be updated, new ones added.
+    </p>
+
+    <div class="drop-zone" id="drop-zone-master" onclick="document.getElementById('file-input-master').click()">
+      <div class="icon">📋</div>
+      <p>Drag & drop MASTER LIST Excel here</p>
+      <p>or <strong>click to browse</strong></p>
+      <div class="filename" id="filename-master"></div>
+    </div>
+    <input type="file" id="file-input-master" accept=".xlsx,.xls" style="display:none" onchange="handleMasterFile(this.files[0])"/>
+
+    <div class="status" id="master-status"></div>
+
+    <div id="master-preview-section" class="hidden">
+      <p style="font-size:13px; color:#666; margin-bottom:8px">Preview (first 5 rows):</p>
+      <div style="overflow-x:auto">
+        <table class="preview-table" id="master-preview-table"></table>
+      </div>
+      <br/>
+      <button class="btn btn-admin" id="btn-upload-master" onclick="uploadMasterList()">⬆ Update MASTER LIST</button>
+      <button class="btn btn-gray" onclick="resetMasterUpload()">Cancel</button>
+    </div>
+  </div>
+  
 </div>
 
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbz8qeeh29JM4qAcnvkzOY7t4ZdvHfxbsAEWmlK8YJAMIA1SMZEZHsHG7VCJjr7GHnNp/exec";
 const ADMIN_PIN = "8888"; // ← change this to your preferred PIN
 
+const MASTER_HEADERS = ["Material", "Material Description", "Material Group", "Sales Unit", "Numerator", "EAN/UPC", "Department"];
+let extractedMasterRows = [];
+
+var dropZoneMaster = document.getElementById("drop-zone-master");
+dropZoneMaster.addEventListener("dragover", function(e) {
+  e.preventDefault();
+  dropZoneMaster.classList.add("drag-over");
+});
+dropZoneMaster.addEventListener("dragleave", function() {
+  dropZoneMaster.classList.remove("drag-over");
+});
+dropZoneMaster.addEventListener("drop", function(e) {
+  e.preventDefault();
+  dropZoneMaster.classList.remove("drag-over");
+  var file = e.dataTransfer.files[0];
+  if (file) handleMasterFile(file);
+});
+
+function handleMasterFile(file) {
+  if (!file) return;
+  if (!file.name.match(/\.(xlsx|xls)$/i)) {
+    setStatus("master-status", "error", "❌ Please upload an Excel file (.xlsx or .xls)");
+    return;
+  }
+
+  document.getElementById("filename-master").textContent = file.name;
+  setStatus("master-status", "loading", "⏳ Reading Excel file...");
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = new Uint8Array(e.target.result);
+      var workbook = XLSX.read(data, { type: "array" });
+      var sheet = workbook.Sheets[workbook.SheetNames[0]];
+      var allRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+
+      if (allRows.length < 2) {
+        setStatus("master-status", "error", "❌ Excel file appears to be empty.");
+        return;
+      }
+
+      extractedMasterRows = [];
+      for (var i = 1; i < allRows.length; i++) {
+        var row = allRows[i];
+        if (!row[0] && !row[5]) continue; // skip empty (no Material and no barcode)
+        var extracted = [
+          row[0] || "", row[1] || "", row[2] || "",
+          row[3] || "", row[4] || "", row[5] || "", row[6] || ""
+        ];
+        extractedMasterRows.push(extracted);
+      }
+
+      setStatus("master-status", "success", "✅ " + extractedMasterRows.length + " rows ready.");
+      showMasterPreview(extractedMasterRows);
+
+    } catch(err) {
+      setStatus("master-status", "error", "❌ Error reading file: " + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showMasterPreview(rows) {
+  var table = document.getElementById("master-preview-table");
+  var preview = rows.slice(0, 5);
+
+  var html = "<tr>" + MASTER_HEADERS.map(function(h) { return "<th>" + h + "</th>"; }).join("") + "</tr>";
+  preview.forEach(function(row) {
+    html += "<tr>" + row.map(function(cell) { return "<td>" + cell + "</td>"; }).join("") + "</tr>";
+  });
+
+  table.innerHTML = html;
+  document.getElementById("master-preview-section").classList.remove("hidden");
+}
+
+function uploadMasterList() {
+  if (extractedMasterRows.length === 0) {
+    setStatus("master-status", "error", "❌ No data to upload.");
+    return;
+  }
+
+  var btn = document.getElementById("btn-upload-master");
+  btn.disabled = true;
+  btn.textContent = "⏳ Uploading...";
+  setStatus("master-status", "loading", "⏳ Sending " + extractedMasterRows.length + " rows...");
+
+  var chunkSize = 500;
+  var chunks = [];
+  for (var i = 0; i < extractedMasterRows.length; i += chunkSize) {
+    chunks.push(extractedMasterRows.slice(i, i + chunkSize));
+  }
+
+  uploadMasterChunk(chunks, 0, { updated: 0, added: 0 });
+}
+
+function uploadMasterChunk(chunks, index, totals) {
+  if (index >= chunks.length) {
+    setStatus("master-status", "success", "✅ Done! Updated: " + totals.updated + " · Added: " + totals.added);
+    document.getElementById("btn-upload-master").disabled = false;
+    document.getElementById("btn-upload-master").textContent = "⬆ Update MASTER LIST";
+    return;
+  }
+
+  fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ action: "uploadMasterList", rows: chunks[index] })
+  })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.success) {
+        totals.updated += data.updated;
+        totals.added += data.added;
+        setStatus("master-status", "loading", "⏳ Processing chunk " + (index + 1) + " of " + chunks.length + "...");
+        uploadMasterChunk(chunks, index + 1, totals);
+      } else {
+        throw new Error(data.error || "Unknown error");
+      }
+    })
+    .catch(function(err) {
+      setStatus("master-status", "error", "❌ Upload failed: " + err.message);
+      document.getElementById("btn-upload-master").disabled = false;
+      document.getElementById("btn-upload-master").textContent = "⬆ Update MASTER LIST";
+    });
+}
+
+function resetMasterUpload() {
+  extractedMasterRows = [];
+  document.getElementById("filename-master").textContent = "";
+  document.getElementById("file-input-master").value = "";
+  document.getElementById("master-preview-section").classList.add("hidden");
+  document.getElementById("master-preview-table").innerHTML = "";
+  setStatus("master-status", "", "");
+}
+  
 function formatDate(val) {
   // If it's already a string like "6/24/26" or "24/6/2026", parse and reformat
   var d;
