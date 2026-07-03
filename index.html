@@ -78,7 +78,7 @@
       <label>Gondola ID</label>
       <input type="text" id="gondola-input" placeholder="e.g. SM1, SM2, SM3..." maxlength="10" style="text-transform: uppercase;" oninput="this.value = this.value.toUpperCase()"/>
 
-      <button class="btn btn-primary" id="btn-start" onclick="checkAndStart()" disabled>Loading...</button>
+      <button class="btn btn-primary" id="btn-start" onclick="()" disabled>Loading...</button>
     </div>
   </div>
 </div>
@@ -147,6 +147,7 @@ let productCache   = null;
 window.addEventListener("load", function() {
   loadProductCache();
   loadDepartments();
+  restoreSession();
 });
 
 function loadProductCache() {
@@ -223,22 +224,53 @@ function checkAndStart() {
       btnStart.textContent = "Start Session";
 
       if (data.exists) {
-        alert("⚠️ Gondola ID \"" + gond + "\" already exists in " + data.department + ". Please use a different Gondola ID.");
-        return;
+        if (data.status === "Done") {
+          alert("⚠️ Gondola ID \"" + gond + "\" is already marked Done in " + data.department + ". Please use a different Gondola ID.");
+          return;
+        }
+        var resume = confirm("Gondola \"" + gond + "\" is already In Progress under " + data.department + ". Resume this session?");
+        if (!resume) return;
+        dept = data.department;
       }
 
-      department = dept;
-      gondola = gond;
-      document.getElementById("header-gondola").textContent = gondola + " · " + department;
-      document.getElementById("tab-bar").style.display = "flex";
-      showScreen("screen-scan");
-      showTab("scan");
+      startSession(dept, gond);
     })
     .catch(function() {
       btnStart.disabled = false;
       btnStart.textContent = "Start Session";
       alert("⚠️ Connection error. Could not verify Gondola ID. Check internet and try again.");
     });
+}
+
+function startSession(dept, gond) {
+  department = dept;
+  gondola = gond;
+  document.getElementById("header-gondola").textContent = gondola + " · " + department;
+  document.getElementById("tab-bar").style.display = "flex";
+  showScreen("screen-scan");
+  showTab("scan");
+  saveSessionToStorage();
+}
+
+function saveSessionToStorage() {
+  try {
+    localStorage.setItem("stocktake_session", JSON.stringify({ gondola: gondola, department: department }));
+  } catch(e) {}
+}
+
+function clearSessionStorage() {
+  try { localStorage.removeItem("stocktake_session"); } catch(e) {}
+}
+
+function restoreSession() {
+  try {
+    var saved = localStorage.getItem("stocktake_session");
+    if (!saved) return;
+    var s = JSON.parse(saved);
+    if (s.gondola && s.department) {
+      startSession(s.department, s.gondola);
+    }
+  } catch(e) {}
 }
 
 // ── TABS ─────────────────────────────────────────────
@@ -372,6 +404,7 @@ function endSession() {
     .then(function(res) { return res.json(); })
     .catch(function() {})
     .finally(function() {
+      clearSessionStorage();
       gondola = "";
       department = "";
       sessionLog = [];
