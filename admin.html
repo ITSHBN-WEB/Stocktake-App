@@ -99,7 +99,8 @@
     <p style="color:#666; font-size:13px; margin-bottom:16px">
       Drop your MASTER LIST Excel (Material, Description, Group, Sales Unit, Numerator, EAN/UPC, Department). Existing barcodes will be updated, new ones added.
     </p>
-
+    <label>Department</label>
+    <input type="text" id="master-dept-input" placeholder="e.g. MILK POWDER" style="text-transform: uppercase;" oninput="this.value = this.value.toUpperCase()"/>
     <div class="drop-zone" id="drop-zone-master" onclick="document.getElementById('file-input-master').click()">
       <div class="icon">📋</div>
       <p>Drag & drop MASTER LIST Excel here</p>
@@ -127,6 +128,7 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbz8qeeh29JM4qAcnvkzOY7t4ZdvHfxbsAEWmlK8YJAMIA1SMZEZHsHG7VCJjr7GHnNp/exec";
 const ADMIN_PIN = "8888"; // ← change this to your preferred PIN
 
+const MASTER_COL_INDICES = [2, 3, 37, 7, 8, 4]; // Material, Description, Group, Sales Unit, Numerator, EAN/UPC
 const MASTER_HEADERS = ["Material", "Material Description", "Material Group", "Sales Unit", "Numerator", "EAN/UPC", "Department"];
 let extractedMasterRows = [];
 
@@ -168,14 +170,22 @@ function handleMasterFile(file) {
         return;
       }
 
+      var dept = document.getElementById("master-dept-input").value.trim().toUpperCase();
+      if (!dept) {
+        setStatus("master-status", "error", "❌ Please enter a Department first.");
+        return;
+      }
+
       extractedMasterRows = [];
       for (var i = 1; i < allRows.length; i++) {
         var row = allRows[i];
-        if (!row[0] && !row[5]) continue; // skip empty (no Material and no barcode)
-        var extracted = [
-          row[0] || "", row[1] || "", row[2] || "",
-          row[3] || "", row[4] || "", row[5] || "", row[6] || ""
-        ];
+        var material = row[2];
+        var barcode  = row[4];
+        if (!material && !barcode) continue;
+        var extracted = MASTER_COL_INDICES.map(function(idx) {
+          return row[idx] !== undefined ? row[idx] : "";
+        });
+        extracted.push(dept); // append Department
         extractedMasterRows.push(extracted);
       }
 
@@ -257,6 +267,7 @@ function resetMasterUpload() {
   extractedMasterRows = [];
   document.getElementById("filename-master").textContent = "";
   document.getElementById("file-input-master").value = "";
+  document.getElementById("master-dept-input").value = "";
   document.getElementById("master-preview-section").classList.add("hidden");
   document.getElementById("master-preview-table").innerHTML = "";
   setStatus("master-status", "", "");
