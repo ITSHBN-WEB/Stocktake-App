@@ -107,7 +107,7 @@
       <p>or <strong>click to browse</strong></p>
       <div class="filename" id="filename-master"></div>
     </div>
-    <input type="file" id="file-input-master" accept=".xlsx,.xls" style="display:none" onchange="(this.files[0])"/>
+    <input type="file" id="file-input-master" accept=".xlsx,.xls" style="display:none"/>
 
     <div class="status" id="master-status"></div>
 
@@ -132,6 +132,12 @@ const MASTER_COL_INDICES = [2, 3, 37, 7, 8, 4]; // Material, Description, Group,
 const MASTER_HEADERS = ["Material", "Material Description", "Material Group", "Sales Unit", "Numerator", "EAN/UPC", "Department"];
 let extractedMasterRows = [];
 
+document.getElementById("file-input-master").addEventListener("change", function(e) {
+  if (e.target.files && e.target.files[0]) {
+    handleMasterFile(e.target.files[0]);
+  }
+});
+  
 var dropZoneMaster = document.getElementById("drop-zone-master");
 dropZoneMaster.addEventListener("dragover", function(e) {
   e.preventDefault();
