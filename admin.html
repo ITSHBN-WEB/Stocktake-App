@@ -179,7 +179,7 @@ function handleMasterFile(file) {
         var extracted = MASTER_COL_INDICES.map(function(idx) {
           return row[idx] !== undefined ? row[idx] : "";
         });
-        extractedMasterRows.push(extracted); // Department appended later at upload time
+        extractedMasterRows.push(extracted);
       }
 
       setStatus("master-status", "success", "✅ " + extractedMasterRows.length + " rows ready.");
@@ -191,7 +191,7 @@ function handleMasterFile(file) {
   };
   reader.readAsArrayBuffer(file);
 }
-
+  
 function showMasterPreview(rows) {
   var table = document.getElementById("master-preview-table");
   var preview = rows.slice(0, 5);
@@ -216,20 +216,19 @@ function uploadMasterList() {
     return;
   }
 
-  // Append department to each row now
-  extractedMasterRows = extractedMasterRows.map(function(row) {
-    return row.length === MASTER_COL_INDICES.length ? row.concat([dept]) : row;
+  var rowsWithDept = extractedMasterRows.map(function(row) {
+    return row.concat([dept]);
   });
 
   var btn = document.getElementById("btn-upload-master");
   btn.disabled = true;
   btn.textContent = "⏳ Uploading...";
-  setStatus("master-status", "loading", "⏳ Sending " + extractedMasterRows.length + " rows...");
+  setStatus("master-status", "loading", "⏳ Sending " + rowsWithDept.length + " rows...");
 
   var chunkSize = 500;
   var chunks = [];
-  for (var i = 0; i < extractedMasterRows.length; i += chunkSize) {
-    chunks.push(extractedMasterRows.slice(i, i + chunkSize));
+  for (var i = 0; i < rowsWithDept.length; i += chunkSize) {
+    chunks.push(rowsWithDept.slice(i, i + chunkSize));
   }
 
   uploadMasterChunk(chunks, 0, { updated: 0, added: 0 });
