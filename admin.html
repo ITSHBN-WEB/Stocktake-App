@@ -107,7 +107,7 @@
       <p>or <strong>click to browse</strong></p>
       <div class="filename" id="filename-master"></div>
     </div>
-    <input type="file" id="file-input-master" accept=".xlsx,.xls" style="display:none" onchange="handleMasterFile(this.files[0])"/>
+    <input type="file" id="file-input-master" accept=".xlsx,.xls" style="display:none" onchange="(this.files[0])"/>
 
     <div class="status" id="master-status"></div>
 
@@ -170,12 +170,6 @@ function handleMasterFile(file) {
         return;
       }
 
-      var dept = document.getElementById("master-dept-input").value.trim().toUpperCase();
-      if (!dept) {
-        setStatus("master-status", "error", "❌ Please enter a Department first.");
-        return;
-      }
-
       extractedMasterRows = [];
       for (var i = 1; i < allRows.length; i++) {
         var row = allRows[i];
@@ -185,8 +179,7 @@ function handleMasterFile(file) {
         var extracted = MASTER_COL_INDICES.map(function(idx) {
           return row[idx] !== undefined ? row[idx] : "";
         });
-        extracted.push(dept); // append Department
-        extractedMasterRows.push(extracted);
+        extractedMasterRows.push(extracted); // Department appended later at upload time
       }
 
       setStatus("master-status", "success", "✅ " + extractedMasterRows.length + " rows ready.");
@@ -213,10 +206,20 @@ function showMasterPreview(rows) {
 }
 
 function uploadMasterList() {
+  var dept = document.getElementById("master-dept-input").value.trim().toUpperCase();
+  if (!dept) {
+    setStatus("master-status", "error", "❌ Please enter a Department first.");
+    return;
+  }
   if (extractedMasterRows.length === 0) {
     setStatus("master-status", "error", "❌ No data to upload.");
     return;
   }
+
+  // Append department to each row now
+  extractedMasterRows = extractedMasterRows.map(function(row) {
+    return row.length === MASTER_COL_INDICES.length ? row.concat([dept]) : row;
+  });
 
   var btn = document.getElementById("btn-upload-master");
   btn.disabled = true;
