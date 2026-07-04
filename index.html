@@ -78,6 +78,13 @@
       <label>Gondola ID</label>
       <input type="text" id="gondola-input" placeholder="e.g. SM1, SM2, SM3..." maxlength="10" style="text-transform: uppercase;" oninput="this.value = this.value.toUpperCase()"/>
 
+      <button class="btn btn-outline" onclick="startGondolaCamera()" id="btn-gondola-camera">📷 Scan Gondola Barcode</button>
+      <div id="gondola-video-container" style="display:none; margin-bottom:14px;">
+        <video id="gondola-video" autoplay muted playsinline style="width:100%; border-radius:8px; background:#000;"></video>
+        <p class="scan-hint">Point camera at the gondola label barcode</p>
+        <button class="btn btn-gray" style="margin-top:10px" onclick="stopGondolaCamera()">Close Camera</button>
+      </div>
+
       <button class="btn btn-primary" id="btn-start" onclick="checkAndStart()" disabled>Loading...</button>
     </div>
   </div>
@@ -310,6 +317,38 @@ function startCamera() {
   }
 }
 
+// ── GONDOLA BARCODE CAMERA (setup screen) ────────────
+let gondolaCodeReader = null;
+let gondolaCameraActive = false;
+
+function startGondolaCamera() {
+  document.getElementById("gondola-video-container").style.display = "block";
+  document.getElementById("btn-gondola-camera").style.display = "none";
+
+  try {
+    gondolaCodeReader = new ZXing.BrowserMultiFormatReader();
+    gondolaCameraActive = true;
+    gondolaCodeReader.decodeFromVideoDevice(null, "gondola-video", function(result, err) {
+      if (result && gondolaCameraActive) {
+        gondolaCameraActive = false;
+        var scannedValue = result.getText().trim().toUpperCase();
+        stopGondolaCamera();
+        document.getElementById("gondola-input").value = scannedValue;
+      }
+    });
+  } catch(e) {
+    alert("Camera error: " + e.message);
+    stopGondolaCamera();
+  }
+}
+
+function stopGondolaCamera() {
+  gondolaCameraActive = false;
+  if (gondolaCodeReader) { gondolaCodeReader.reset(); gondolaCodeReader = null; }
+  document.getElementById("gondola-video-container").style.display = "none";
+  document.getElementById("btn-gondola-camera").style.display = "block";
+}
+  
 function stopCamera() {
   cameraActive = false;
   if (codeReader) { codeReader.reset(); codeReader = null; }
