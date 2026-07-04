@@ -128,6 +128,7 @@
     </ul>
   </div>
   <button class="btn btn-danger" onclick="endSession()">End Session / Change Gondola</button>
+  <button class="btn btn-gray" onclick="cancelCount()">✖ Cancel Count (delete all)</button>
 </div>
 
 <!-- Tab Bar -->
@@ -420,7 +421,7 @@ function saveScan() {
     .then(function(data) {
       if (data.success) {
         setStatus("success", "✅ Saved to " + department);
-        addToLog(currentProduct.description, qty, currentProduct.uom);
+        addToLog(currentProduct.description, qty, currentProduct.uom, data.row);
         resetScan();
       } else {
         setStatus("error", "❌ Save failed: " + (data.error || "unknown error"));
@@ -487,8 +488,8 @@ function setStatus(type, msg) {
   box.textContent = msg;
 }
 
-function addToLog(name, qty, uom) {
-  sessionLog.unshift({ name: name, qty: qty, uom: uom, time: new Date().toLocaleTimeString() });
+function addToLog(name, qty, uom, row) {
+  sessionLog.unshift({ name: name, qty: qty, uom: uom, time: new Date().toLocaleTimeString(), row: row });
   renderLog();
 }
 
@@ -499,8 +500,95 @@ function renderLog() {
     return;
   }
   list.innerHTML = sessionLog.map(function(item) {
-    return '<li class="log-item"><div class="log-name">' + item.name + '</div><div class="log-meta">Qty: ' + item.qty + ' ' + item.uom + ' &nbsp;·&nbsp; ' + item.time + '</div></li>';
+    return '<li class="log-item">' +
+      '<div class="log-name">' + item.name + '</div>' +
+      '<div class="log-meta">Qty: ' + item.qty + ' ' + item.uom + ' &nbsp;·&nbsp; ' + item.time + '</div>' +
+      '<div style="margin-top:8px; display:flex; gap:8px;">' +
+        '<button class="btn btn-gray" style="width:auto; padding:6px 14px; margin:0; font-size:12px;" onclick="editLogItem(' + item.row + ')">✎ Edit Qty</button>' +
+        '<button class="btn btn-danger" style="width:auto; padding:6px 14px; margin:0; font-size:12px;" onclick="deleteLogItem(' + item.row + ')">🗑 Delete</button>' +
+      '</div>' +
+    '</li>';
   }).join("");
+}
+
+function editLogItem(row) {
+  var item = sessionLog.find(function(i) { return i.row === row; });
+  if (!item) return;
+
+  var newQty = prompt("Enter new quantity for \"" + item.name + "\":", item.qty);
+  if (newQty === null) return;
+  if (newQty === "" || isNaN(newQty) || Number(newQty) < 0) {
+    alert("Please enter a valid quantity.");
+    return;
+  }
+
+  fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ action: "updateScan", department: department, row: row, qty: Number(newQty) })
+  })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.success) {
+        item.qty = Number(newQty);
+        renderLog();
+      } else {
+        alert("❌ Failed to update: " + (data.error || "unknown error"));
+      }
+    })
+    .catch(function() {
+      alert("⚠️ Connection error. Could not update.");
+    });
+}
+
+function deleteLogItem(row) {
+  if (!confirm("Delete this scanned item? This cannot be undone.")) return;
+
+  fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ action: "deleteScan", department: department, row: row })
+  })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.success) {
+        sessionLog = sessionLog.filter(function(i) { return i.row !== row; });
+        sessionLog.forEach(function(i) { if (i.row > row) i.row = i.row - 1; });
+        renderLog();
+      } else {
+        alert("❌ Failed to delete: " + (data.error || "unknown error"));
+      }
+    })
+    .catch(function() {
+      alert("⚠️ Connection error. Could not delete.");
+    });
+}
+
+function cancelCount() {
+  if (!confirm("Cancel this count for " + gondola + "? ALL scanned items for this gondola will be permanently deleted.")) return;
+
+  fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ action: "cancelSession", gondola: gondola, department: department })
+  })
+    .then(function(res) { return res.json(); })
+    .catch(function() {})
+    .finally(function() {
+      clearSessionStorage();
+      gondola = "";
+      department = "";
+      sessionLog = [];
+      currentProduct = null;
+      stopCamera();
+      resetScan();
+      renderLog();
+      document.getElementById("gondola-input").value = "";
+      document.getElementById("department-input").value = "";
+      document.getElementById("header-gondola").textContent = "No session";
+      document.getElementById("tab-bar").style.display = "none";
+      showScreen("screen-setup");
+    });
 }
 </script>
 </body>
