@@ -366,6 +366,11 @@ function lookupBarcode() {
   if (productCache) {
     var product = productCache[barcode];
     if (product) {
+      if (product.department.toUpperCase() !== department.toUpperCase()) {
+        setStatus("error", "❌ This item belongs to \"" + product.department + "\", not \"" + department + "\". Wrong department for this gondola.");
+        currentProduct = null;
+        return;
+      }
       currentProduct = product;
       showProduct(product);
       setStatus("success", "✅ Product found!");
@@ -381,6 +386,11 @@ function lookupBarcode() {
     .then(function(res) { return res.json(); })
     .then(function(data) {
       if (data.found) {
+        if (data.department.toUpperCase() !== department.toUpperCase()) {
+          setStatus("error", "❌ This item belongs to \"" + data.department + "\", not \"" + department + "\". Wrong department for this gondola.");
+          currentProduct = null;
+          return;
+        }
         currentProduct = data;
         showProduct(data);
         setStatus("success", "✅ Product found!");
@@ -395,10 +405,18 @@ function lookupBarcode() {
 }
 
 // ── SAVE SCAN ─────────────────────────────────────────
+let isSaving = false;
+
 function saveScan() {
+  if (isSaving) return; // block rapid double-taps
   var qty = document.getElementById("qty-input").value.trim();
   if (!qty || Number(qty) < 0) { alert("Please enter a valid quantity."); return; }
   if (!currentProduct) { alert("No product loaded."); return; }
+
+  isSaving = true;
+  var saveBtn = document.querySelector('#product-card .btn-success');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving..."; }
+
   setStatus("loading", "💾 Saving to Google Sheet...");
 
   var payload = {
@@ -429,6 +447,10 @@ function saveScan() {
     })
     .catch(function() {
       setStatus("error", "⚠️ Connection error. Could not save.");
+    })
+    .finally(function() {
+      isSaving = false;
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "✔ Save to Sheet"; }
     });
 }
 
