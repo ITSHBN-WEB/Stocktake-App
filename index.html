@@ -113,7 +113,7 @@
       <p><span class="badge" id="p-uom"></span><span id="p-dept"></span></p>
       <p style="margin-top:6px;color:#666;font-size:13px">Material: <span id="p-mat"></span></p>
     </div>
-    <input type="number" id="qty-input" placeholder="Enter quantity..." min="0"/>
+    <input type="number" id="qty-input" placeholder="Enter quantity..." min="0" max="9999" oninput="if(this.value.length > 4) this.value = this.value.slice(0, 4);"/>
     <button class="btn btn-success" onclick="saveScan()">✔ Save to Sheet</button>
     <button class="btn btn-gray" onclick="resetScan()">Cancel</button>
   </div>
