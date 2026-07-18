@@ -75,6 +75,9 @@
         <option value="">Loading departments...</option>
       </select>
 
+      <label>Staff Name</label>
+      <input type="text" id="staffname-input" placeholder="Enter your name..." maxlength="40"/>
+      
       <label>Gondola ID</label>
       <input type="text" id="gondola-input" placeholder="e.g. SM1, SM2, SM3..." maxlength="10" style="text-transform: uppercase;" oninput="this.value = this.value.toUpperCase()"/>
 
@@ -146,6 +149,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz8qeeh29JM4qAcnvkzOY7t
 
 let gondola        = "";
 let department      = "";
+let staffName       = "";
 let currentProduct = null;
 let sessionLog     = [];
 let codeReader     = null;
@@ -217,7 +221,9 @@ function checkReady() {
 function checkAndStart() {
   var dept = document.getElementById("department-input").value;
   var gond = document.getElementById("gondola-input").value.trim().toUpperCase();
+  var name = document.getElementById("staffname-input").value.trim();
 
+  if (!name) { alert("Please enter your name."); return; }
   if (!dept) { alert("Please select a department."); return; }
   if (!gond) { alert("Please enter a Gondola ID."); return; }
 
@@ -241,6 +247,7 @@ function checkAndStart() {
         dept = data.department;
       }
 
+      staffName = name;
       startSession(dept, gond);
     })
     .catch(function() {
@@ -253,7 +260,7 @@ function checkAndStart() {
 function startSession(dept, gond) {
   department = dept;
   gondola = gond;
-  document.getElementById("header-gondola").textContent = gondola + " · " + department;
+  document.getElementById("header-gondola").textContent = gondola + " · " + department + " · " + staffName;
   document.getElementById("tab-bar").style.display = "flex";
   showScreen("screen-scan");
   showTab("scan");
@@ -262,7 +269,7 @@ function startSession(dept, gond) {
 
 function saveSessionToStorage() {
   try {
-    localStorage.setItem("stocktake_session", JSON.stringify({ gondola: gondola, department: department }));
+    localStorage.setItem("stocktake_session", JSON.stringify({ gondola: gondola, department: department, staffName: staffName }));
   } catch(e) {}
 }
 
@@ -276,6 +283,7 @@ function restoreSession() {
     if (!saved) return;
     var s = JSON.parse(saved);
     if (s.gondola && s.department) {
+      staffName = s.staffName || "";
       startSession(s.department, s.gondola);
     }
   } catch(e) {}
@@ -423,6 +431,7 @@ function saveScan() {
   var payload = {
     gondola:     gondola,
     department:  department,
+    staffName:   staffName,
     barcode:     currentProduct.barcode,
     material:    currentProduct.material,
     description: currentProduct.description,
@@ -470,6 +479,7 @@ function endSession() {
       clearSessionStorage();
       gondola = "";
       department = "";
+      staffName = "";
       sessionLog = [];
       currentProduct = null;
       stopCamera();
@@ -605,13 +615,15 @@ function cancelCount() {
       clearSessionStorage();
       gondola = "";
       department = "";
+      staffName = "";
       sessionLog = [];
       currentProduct = null;
       stopCamera();
       resetScan();
       renderLog();
-      document.getElementById("gondola-input").value = "";
+      ddocument.getElementById("gondola-input").value = "";
       document.getElementById("department-input").value = "";
+      document.getElementById("staffname-input").value = "";
       document.getElementById("header-gondola").textContent = "No session";
       document.getElementById("tab-bar").style.display = "none";
       showScreen("screen-setup");
