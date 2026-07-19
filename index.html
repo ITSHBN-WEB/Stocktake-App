@@ -454,7 +454,7 @@ function saveScan() {
     .then(function(data) {
       if (data.success) {
         setStatus("success", "✅ Saved to " + department);
-        addToLog(currentProduct.description, qty, currentProduct.uom, data.row, currentProduct.numerator);
+        addToLog(currentProduct.description, qty, currentProduct.uom, data.row, currentProduct.numerator, currentProduct.barcode);
         resetScan();
       } else {
         setStatus("error", "❌ Save failed: " + (data.error || "unknown error"));
@@ -501,7 +501,7 @@ function endSession() {
 // ── UI HELPERS ────────────────────────────────────────
 function showProduct(data) {
   document.getElementById("p-name").textContent = data.description;
-  document.getElementById("p-uom").textContent  = data.uom + (data.numerator > 1 ? " (x" + data.numerator + ")" : "");
+  document.getElementById("p-uom").textContent  = data.uom + (data.numerator > 1 ? " (" + data.numerator + "'s)" : "");
   document.getElementById("p-dept").textContent = " " + (data.department || department);
   document.getElementById("p-mat").textContent  = data.material;
   document.getElementById("product-card").style.display = "block";
@@ -526,8 +526,8 @@ function setStatus(type, msg) {
   box.textContent = msg;
 }
 
-function addToLog(name, qty, uom, row, numerator) {
-  sessionLog.unshift({ name: name, qty: qty, uom: uom, time: new Date().toLocaleTimeString(), row: row, numerator: numerator });
+function addToLog(name, qty, uom, row, numerator, barcode) {
+  sessionLog.unshift({ name: name, qty: qty, uom: uom, time: new Date().toLocaleTimeString(), row: row, numerator: numerator, barcode: barcode });
   renderLog();
 }
 
@@ -538,10 +538,11 @@ function renderLog() {
     return;
   }
   list.innerHTML = sessionLog.map(function(item) {
-    var uomLabel = item.uom + (item.numerator > 1 ? " (x" + item.numerator + ")" : "");
+    var uomLabel = item.uom + (item.numerator > 1 ? " (" + item.numerator + "'s)" : "");
     return '<li class="log-item">' +
       '<div class="log-name">' + item.name + '</div>' +
       '<div class="log-meta">Qty: ' + item.qty + ' ' + uomLabel + ' &nbsp;·&nbsp; ' + item.time + '</div>' +
+      '<div class="log-meta">EAN/UPC: ' + item.barcode + '</div>' +
       '<div style="margin-top:8px; display:flex; gap:8px;">' +
         '<button class="btn btn-gray" style="width:auto; padding:6px 14px; margin:0; font-size:12px;" onclick="editLogItem(' + item.row + ')">✎ Edit Qty</button>' +
         '<button class="btn btn-danger" style="width:auto; padding:6px 14px; margin:0; font-size:12px;" onclick="deleteLogItem(' + item.row + ')">🗑 Delete</button>' +
