@@ -420,12 +420,38 @@ function lookupBarcode() {
 // ── SAVE SCAN ─────────────────────────────────────────
 let isSaving = false;
 
-function saveScan() {
+function generateRequestId() {
+  return Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+}
+
+function saveScan(retryPayload, retryId) {
   if (isSaving) return; // block rapid double-taps
-  var qty = document.getElementById("qty-input").value.trim();
-  if (!qty || Number(qty) < 0) { alert("Please enter a valid quantity."); return; }
-  if (Number(qty) > 9999) { alert("Quantity cannot exceed 9999. Please check for a scanning error."); return; }
-  if (!currentProduct) { alert("No product loaded."); return; }
+
+  var payload, requestId;
+
+  if (retryPayload) {
+    payload = retryPayload;
+    requestId = retryId;
+  } else {
+    var qty = document.getElementById("qty-input").value.trim();
+    if (!qty || Number(qty) < 0) { alert("Please enter a valid quantity."); return; }
+    if (Number(qty) > 9999) { alert("Quantity cannot exceed 9999. Please check for a scanning error."); return; }
+    if (!currentProduct) { alert("No product loaded."); return; }
+
+    requestId = generateRequestId();
+    payload = {
+      requestId:   requestId,
+      gondola:     gondola,
+      department:  department,
+      staffName:   staffName,
+      barcode:     currentProduct.barcode,
+      material:    currentProduct.material,
+      description: currentProduct.description,
+      uom:         currentProduct.uom,
+      numerator:   currentProduct.numerator,
+      qty:         Number(qty)
+    };
+  }
 
   isSaving = true;
   var saveBtn = document.querySelector('#product-card .btn-success');
@@ -433,17 +459,8 @@ function saveScan() {
 
   setStatus("loading", "💾 Saving to Google Sheet...");
 
-  var payload = {
-    gondola:     gondola,
-    department:  department,
-    staffName:   staffName,
-    barcode:     currentProduct.barcode,
-    material:    currentProduct.material,
-    description: currentProduct.description,
-    uom:         currentProduct.uom,
-    numerator:   currentProduct.numerator,
-    qty:         Number(qty)
-  };
+  var savedProduct = currentProduct;
+  var savedQty = payload.qty;
 
   fetch(API_URL, {
     method: "POST",
@@ -454,18 +471,23 @@ function saveScan() {
     .then(function(data) {
       if (data.success) {
         setStatus("success", "✅ Saved to " + department);
-        addToLog(currentProduct.description, qty, currentProduct.uom, data.row, currentProduct.numerator, currentProduct.barcode);
+        addToLog(savedProduct.description, savedQty, savedProduct.uom, data.row, savedProduct.numerator, savedProduct.barcode);
         resetScan();
       } else {
         setStatus("error", "❌ Save failed: " + (data.error || "unknown error"));
       }
-    })
-    .catch(function() {
-      setStatus("error", "⚠️ Connection error. Could not save.");
-    })
-    .finally(function() {
       isSaving = false;
       if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "✔ Save to Sheet"; }
+    })
+    .catch(function() {
+      isSaving = false;
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Retry Save"; }
+      var doRetry = confirm("⚠️ Connection error. The item may or may not have been saved. Tap OK to safely retry (it will NOT create a duplicate), or Cancel to check manually.");
+      if (doRetry) {
+        saveScan(payload, requestId);
+      } else {
+        setStatus("error", "⚠️ Connection error. Could not confirm save.");
+      }
     });
 }
 
